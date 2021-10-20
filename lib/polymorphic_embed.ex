@@ -360,6 +360,8 @@ defmodule PolymorphicEmbed do
     |> merge_polymorphic_keys(changes, types, msg_func)
   end
 
+  def traverse_errors(%{}, msg_func) when is_function(msg_func, 1) or is_function(msg_func, 3), do: %{}
+
   defp merge_polymorphic_keys(map, changes, types, msg_func) do
     Enum.reduce types, map, fn
       {field, {:parameterized, PolymorphicEmbed, _opts}}, acc ->
