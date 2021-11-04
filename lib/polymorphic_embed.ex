@@ -246,7 +246,8 @@ defmodule PolymorphicEmbed do
 
   def load(data, loader, params) when is_map(data), do: do_load(data, loader, params)
 
-  def load(data, loader, params) when is_binary(data), do: do_load(Jason.decode!(data), loader, params)
+  def load(data, loader, params) when is_binary(data),
+    do: do_load(Jason.decode!(data), loader, params)
 
   def do_load(data, _loader, %{types_metadata: types_metadata, type_field: type_field}) do
     case do_get_polymorphic_module_from_map(data, type_field, types_metadata) do
@@ -355,15 +356,15 @@ defmodule PolymorphicEmbed do
 
   def traverse_errors(%Ecto.Changeset{changes: changes, types: types} = changeset, msg_func)
       when is_function(msg_func, 1) or is_function(msg_func, 3) do
-
     Ecto.Changeset.traverse_errors(changeset, msg_func)
     |> merge_polymorphic_keys(changes, types, msg_func)
   end
 
-  def traverse_errors(%{}, msg_func) when is_function(msg_func, 1) or is_function(msg_func, 3), do: %{}
+  def traverse_errors(%{}, msg_func) when is_function(msg_func, 1) or is_function(msg_func, 3),
+    do: %{}
 
   defp merge_polymorphic_keys(map, changes, types, msg_func) do
-    Enum.reduce types, map, fn
+    Enum.reduce(types, map, fn
       {field, {:parameterized, PolymorphicEmbed, _opts}}, acc ->
         if changeset = Map.get(changes, field) do
           case traverse_errors(changeset, msg_func) do
@@ -383,15 +384,25 @@ defmodule PolymorphicEmbed do
             end)
 
           case all_empty? do
-            true  -> acc
+            true -> acc
             false -> Map.put(acc, field, errors)
           end
         else
           acc
         end
 
-     {_, _}, acc ->
-      acc
-    end
+      {field, {:embed, %Ecto.Embedded{field: field}}}, acc ->
+        if changeset = Map.get(changes, field) do
+          case traverse_errors(changeset, msg_func) do
+            errors when errors == %{} -> acc
+            errors -> Map.put(acc, field, errors)
+          end
+        else
+          acc
+        end
+
+      {_, _}, acc ->
+        acc
+    end)
   end
 end
