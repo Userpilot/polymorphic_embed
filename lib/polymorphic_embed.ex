@@ -410,7 +410,7 @@ defmodule PolymorphicEmbed do
       # where the :cardinality atom can be one of: `:one` or `:many`, hence can be
       # pattern-matched in order to distinguish between `embeds_one` and `embeds_many`
       {field, {:embed, %Ecto.Embedded{cardinality: :many, field: field}}}, acc ->
-        with multiple_changesets when not is_nil(multiple_changesets) <- Map.get(changes, field) do
+        if multiple_changesets = Map.get(changes, field) do
           Enum.each(multiple_changesets, fn changeset ->
             case traverse_errors(changeset, msg_func) do
               errors when errors == %{} -> acc
@@ -420,7 +420,7 @@ defmodule PolymorphicEmbed do
 
           acc
         else
-          nil -> acc
+          acc
         end
 
       {_, _}, acc ->
