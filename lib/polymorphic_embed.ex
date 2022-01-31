@@ -375,6 +375,11 @@ defmodule PolymorphicEmbed do
           acc
         end
 
+      {field, {:parameterized, parameterized_type, _opts}}, acc ->
+        if function_exported?(parameterized_type, :traverse_errors, 4),
+          do: parameterized_type.traverse_errors(field, changes, msg_func, acc),
+          else: acc
+
       {field, {:array, {:parameterized, PolymorphicEmbed, _opts}}}, acc ->
         if changesets = Map.get(changes, field) do
           {errors, all_empty?} =
