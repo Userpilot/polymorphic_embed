@@ -1,9 +1,7 @@
 defmodule PolymorphicEmbed.Channel.SMS do
   use Ecto.Schema
   import Ecto.Changeset
-  import PolymorphicEmbed, only: [cast_polymorphic_embed: 3]
-
-  @primary_key false
+  import PolymorphicEmbed
 
   embedded_schema do
     field(:number, :string)
@@ -11,7 +9,7 @@ defmodule PolymorphicEmbed.Channel.SMS do
 
     field(:custom, :boolean, default: false)
 
-    field(:provider, PolymorphicEmbed,
+    polymorphic_embeds_one(:provider,
       types: [
         twilio: PolymorphicEmbed.Channel.TwilioSMSProvider,
         test: PolymorphicEmbed.Channel.AcmeSMSProvider
@@ -20,8 +18,17 @@ defmodule PolymorphicEmbed.Channel.SMS do
       on_replace: :update
     )
 
-    embeds_one(:result, PolymorphicEmbed.Channel.SMSResult)
-    embeds_many(:attempts, PolymorphicEmbed.Channel.SMSAttempts)
+    polymorphic_embeds_one(:fallback_provider,
+      types: [
+        twilio: PolymorphicEmbed.Channel.TwilioSMSProvider,
+        test: PolymorphicEmbed.Channel.AcmeSMSProvider
+      ],
+      on_type_not_found: :nilify,
+      on_replace: :update
+    )
+
+    embeds_one(:result, PolymorphicEmbed.Channel.SMSResult, on_replace: :update)
+    embeds_many(:attempts, PolymorphicEmbed.Channel.SMSAttempts, on_replace: :delete)
   end
 
   def changeset(struct, attrs) do
@@ -30,6 +37,7 @@ defmodule PolymorphicEmbed.Channel.SMS do
     |> cast_embed(:result)
     |> cast_embed(:attempts)
     |> cast_polymorphic_embed(:provider, required: true)
+    |> cast_polymorphic_embed(:fallback_provider, required: false)
     |> validate_required([:number, :country_code])
   end
 

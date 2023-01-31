@@ -1,5 +1,35 @@
 # Changelog
 
+## 3.0.x
+
+  * Default value for polymorphic list of embeds is `[]` instead of `nil` (following `embeds_many/3`)
+
+### Migration from 2.x to 3.x
+
+  * Use `polymorphic_embeds_one/2` and `polymorphic_embeds_many/2` macros instead of `field/3`
+
+## 2.0.x
+
+  * Support IDs
+
+### Migration from 1.x to 2.x
+
+  * Make sure that every existing polymorphic `embedded_schema` contains the setting `@primary_key false`
+
+## 1.10.x
+
+  * Add `polymorphic_embed_inputs_for/2` for displaying forms in LiveView
+  * Add `polymorphic_embed_inputs_for/3` for displaying forms in Phoenix templates without
+    needing to specify the type
+
+## 1.9.x
+
+  * Add `PolymorphicEmbed.types/2` function returning the possible types for a polymorphic field
+
+## 1.8.x
+
+  * Add `:nilify` and `:ignore` for `:on_type_not_found` option
+
 ## 1.7.x
 
   * Support the SQLite3 Ecto adapter `ecto_sqlite3`

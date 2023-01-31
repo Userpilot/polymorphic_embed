@@ -24,16 +24,16 @@ Find the schema code and explanations below.
 defmodule MyApp.Reminder do
   use Ecto.Schema
   import Ecto.Changeset
-  import PolymorphicEmbed, only: [cast_polymorphic_embed: 3]
+  import PolymorphicEmbed
 
   schema "reminders" do
     field :date, :utc_datetime
     field :text, :string
 
-    field :channel, PolymorphicEmbed,
+    polymorphic_embeds_one :channel,
       types: [
         sms: MyApp.Channel.SMS,
-        email: [module: MyApp.Channel.Email, identify_by_fields: [:address, :confirmed]]
+        email: MyApp.Channel.Email
       ],
       on_type_not_found: :raise,
       on_replace: :update
@@ -80,6 +80,14 @@ defmodule MyApp.Channel.SMS do
   end
 end
 ```
+
+In your migration file, you may use the type `:map` for both `polymorphic_embeds_one/2` and `polymorphic_embeds_many/2` fields.
+
+```elixir
+add(:channel, :map)
+```
+
+[It is not recommended](https://hexdocs.pm/ecto/3.8.4/Ecto.Schema.html#embeds_many/3) to use `{:array, :map}` for a list of embeds.
 
 ### `cast_polymorphic_embed/3`
 
@@ -134,7 +142,7 @@ useful if you need to store incomplete data, which might not allow identifying t
 Lists of polymorphic embeds are also supported:
 
 ```elixir
-field :contexts, {:array, PolymorphicEmbed},
+polymorphic_embeds_many :contexts,
   types: [
     location: MyApp.Context.Location,
     age: MyApp.Context.Age,
@@ -148,8 +156,14 @@ field :contexts, {:array, PolymorphicEmbed},
 
 * `:types` – discussed above.
 * `:type_field` – specify a custom type field. Defaults to `:__type__`.
-* `:on_type_not_found` – specify whether to raise or add a changeset error if the embed's type cannot be inferred.
-  Possible values are `:raise` and `:changeset_error`. By default, a changeset error "is invalid" is added.
+* `:on_type_not_found` – specify what to do if the embed's type cannot be inferred.
+  Possible values are
+  - `:raise`: raise an error
+  - `:changeset_error`: add a changeset error
+  - `:nilify`: replace the data by `nil`; only for single (non-list) embeds
+  - `:ignore`: ignore the data; only for lists of embeds
+
+  By default, a changeset error "is invalid" is added.
 * `:on_replace` – mandatory option that can only be set to `:update` for a single embed and `:delete` for a list of
   embeds (we force a value as the default value of this option for `embeds_one` and `embeds_many` is `:raise`).
 
@@ -168,7 +182,7 @@ def view do
 end
 ```
 
-This provides you with a `polymorphic_embed_inputs_for/4` function.
+This provides you with the `polymorphic_embed_inputs_for/3` and `polymorphic_embed_inputs_for/4` functions.
 
 Here is an example form using the imported function:
 
@@ -186,7 +200,40 @@ Here is an example form using the imported function:
 <% end %>
 ```
 
-`polymorphic_embed_inputs_for/4` also renders a hidden input for the `"__type__"` field.
+When using `polymorphic_embed_inputs_for/4`, you have to manually specify the type. When the embed is `nil`, empty fields will be displayed.
+
+`polymorphic_embed_inputs_for/3` doesn't require the type to be specified. When the embed is `nil`, no fields are displayed.
+
+They both render a hidden input for the `"__type__"` field.
+
+### Displaying form inputs and errors in LiveView
+
+You may use `polymorphic_embed_inputs_for/2` when working with LiveView.
+
+```elixir
+<.form
+  let={f}
+  for={@changeset}
+  id="reminder-form"
+  phx-change="validate"
+  phx-submit="save"
+>
+  <%= for channel_form <- polymorphic_embed_inputs_for f, :channel do %>
+    <%= hidden_inputs_for(channel_form) %>
+
+    <%= case get_polymorphic_type(channel_form, Reminder, :channel) do %>
+      <% :sms -> %>
+        <%= label channel_form, :number %>
+        <%= text_input channel_form, :number %>
+
+      <% :email -> %>
+        <%= label channel_form, :email %>
+        <%= text_input channel_form, :email %>
+  <% end %>
+</.form>
+```
+
+Using this function, you have to render the necessary hidden inputs manually as shown above.
 
 ### Get the type of a polymorphic embed
 
@@ -217,7 +264,7 @@ Add `polymorphic_embed` for Elixir as a dependency in your `mix.exs` file:
 ```elixir
 def deps do
   [
-    {:polymorphic_embed, "~> 1.7.2"}
+    {:polymorphic_embed, "~> 3.0.5"}
   ]
 end
 ```
