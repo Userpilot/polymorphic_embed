@@ -1,6 +1,8 @@
 defmodule PolymorphicEmbed do
   use Ecto.ParameterizedType
 
+  @relations [:embed, :assoc]
+
   defmacro polymorphic_embeds_one(field_name, opts) do
     quote do
       field(unquote(field_name), PolymorphicEmbed, unquote(opts))
@@ -418,10 +420,14 @@ defmodule PolymorphicEmbed do
   defp raise_cannot_infer_type_from_data(data),
     do: raise("could not infer polymorphic embed from data #{inspect(data)}")
 
-  def traverse_errors(%Ecto.Changeset{changes: changes, types: types} = changeset, msg_func)
+  def traverse_errors(
+        %Ecto.Changeset{changes: changes, types: types, errors: errors} = changeset,
+        msg_func
+      )
       when is_function(msg_func, 1) or is_function(msg_func, 3) do
-    changeset
-    |> Ecto.Changeset.traverse_errors(msg_func)
+    errors
+    |> Enum.reverse()
+    |> merge_keyword_keys(msg_func, changeset)
     |> merge_polymorphic_keys(changes, types, msg_func)
   end
 
@@ -431,6 +437,20 @@ defmodule PolymorphicEmbed do
   def traverse_errors(%_{}, msg_func)
       when is_function(msg_func, 1) or is_function(msg_func, 3) do
     %{}
+  end
+
+  defp merge_keyword_keys(keyword_list, msg_func, _) when is_function(msg_func, 1) do
+    Enum.reduce(keyword_list, %{}, fn {key, val}, acc ->
+      val = msg_func.(val)
+      Map.update(acc, key, [val], &[val | &1])
+    end)
+  end
+
+  defp merge_keyword_keys(keyword_list, msg_func, changeset) when is_function(msg_func, 3) do
+    Enum.reduce(keyword_list, %{}, fn {key, val}, acc ->
+      val = msg_func.(changeset, key, val)
+      Map.update(acc, key, [val], &[val | &1])
+    end)
   end
 
   defp merge_polymorphic_keys(map, changes, types, msg_func) do
@@ -470,7 +490,7 @@ defmodule PolymorphicEmbed do
       # to the changeset type {:embed, %Ecto.Embedded{cardinality: :one, field: field}}
       # where the :cardinality atom can be one of: `:one` or `:many`, hence can be
       # pattern-matched in order to distinguish between `embeds_one` and `embeds_many`
-      {field, {:embed, %Ecto.Embedded{cardinality: :one, field: field}}}, acc ->
+      {field, {tag, %Ecto.Embedded{cardinality: :one, field: field}}}, acc when tag in @relations ->
         if changeset = Map.get(changes, field) do
           case traverse_errors(changeset, msg_func) do
             errors when errors == %{} -> acc
@@ -484,18 +504,16 @@ defmodule PolymorphicEmbed do
       # to the changeset type {:embed, %Ecto.Embedded{cardinality: :many, field: field}}
       # where the :cardinality atom can be one of: `:one` or `:many`, hence can be
       # pattern-matched in order to distinguish between `embeds_one` and `embeds_many`
-      {field, {:embed, %Ecto.Embedded{cardinality: :many, field: field}}}, acc ->
+      {field, {tag, %Ecto.Embedded{cardinality: :many, field: field}}}, acc when tag in @relations ->
         multiple_changesets = Map.get(changes, field)
 
         if not is_nil(multiple_changesets) and is_list(multiple_changesets) do
-          Enum.each(multiple_changesets, fn changeset ->
+          Enum.reduce(multiple_changesets, acc, fn changeset, acc ->
             case traverse_errors(changeset, msg_func) do
               errors when errors == %{} -> acc
-              errors -> Map.put(acc, field, errors)
+              errors -> Map.update(acc, field, [errors], &[errors | &1])
             end
           end)
-
-          acc
         else
           acc
         end
