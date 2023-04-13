@@ -488,9 +488,11 @@ defmodule PolymorphicEmbed do
 
       # `Ecto.Schema.embeds_one()` field(s) inside of ecto-based schemas gets translated
       # to the changeset type {:embed, %Ecto.Embedded{cardinality: :one, field: field}}
+      # and `Ecto.Schema.belongs_to()` get translated to
+      # {:assoc, %Ecto.Association.Has{cardinality: :one, field: field}}
       # where the :cardinality atom can be one of: `:one` or `:many`, hence can be
-      # pattern-matched in order to distinguish between `embeds_one` and `embeds_many`
-      {field, {tag, %Ecto.Embedded{cardinality: :one, field: field}}}, acc when tag in @relations ->
+      # pattern-matched in order to distinguish between `one` and `many` cardinality
+      {field, {tag, %{cardinality: :one, field: field}}}, acc when tag in @relations ->
         if changeset = Map.get(changes, field) do
           case traverse_errors(changeset, msg_func) do
             errors when errors == %{} -> acc
@@ -502,9 +504,11 @@ defmodule PolymorphicEmbed do
 
       # `Ecto.Schema.embeds_many()` field(s) inside of ecto-based schemas gets translated
       # to the changeset type {:embed, %Ecto.Embedded{cardinality: :many, field: field}}
+      # and `Ecto.Schema.has_many()` get translated to
+      # {:assoc, %Ecto.Association.Has{cardinality: :many, field: field}}
       # where the :cardinality atom can be one of: `:one` or `:many`, hence can be
-      # pattern-matched in order to distinguish between `embeds_one` and `embeds_many`
-      {field, {tag, %Ecto.Embedded{cardinality: :many, field: field}}}, acc when tag in @relations ->
+      # pattern-matched in order to distinguish between `one` and `many` cardinality
+      {field, {tag, %{cardinality: :many, field: field}}}, acc when tag in @relations ->
         multiple_changesets = Map.get(changes, field)
 
         if not is_nil(multiple_changesets) and is_list(multiple_changesets) do
@@ -518,7 +522,7 @@ defmodule PolymorphicEmbed do
           acc
         end
 
-      {_, _}, acc ->
+      data, acc ->
         acc
     end)
   end
