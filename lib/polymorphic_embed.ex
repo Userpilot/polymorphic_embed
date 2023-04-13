@@ -522,7 +522,7 @@ defmodule PolymorphicEmbed do
           acc
         end
 
-      data, acc ->
+      {_, _}, acc ->
         acc
     end)
   end
